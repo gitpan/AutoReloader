@@ -1,23 +1,48 @@
-=head1 NAME
+AutoReloader version 0.01
+=========================
 
-AutoReloader - Reload %INC files when updated on disk
+This package is a drop-in replacement for AutoLoader.
+Other than the core AutoLoader package, this one provides lazy
+loading of files that return a subroutine reference on require.
 
-=head1 SYNOPSIS
+But it's main purpose is to provide reloading of subs.
 
-  AutoReloader->check;
+Each subroutine, when loaded, is wrapped into an outer sub.
+Inside that one, a check of the subroutine's source file is
+done, and if the value returned from that sub is different to
+the value at load time, the function is reloaded. If the
+reload fails, only the memorized check value is updated, and
+the function's previous version is retained. After checking,
+a magic 'goto $funcref' is performed - the function is called.
 
-=head1 DESCRIPTION
+This is most useful for development and for long running
+applications that must be updated at runtime, or for those that
+wish to extend, grow or shrink packages at runtime.
 
-When Perl pulls a file via C<require>, it stores the filename in the
-global hash C<%INC>.  The next time Perl tries to C<require> the same
-file, it sees the file in C<%INC> and does not reload from disk.  This
-module's handler iterates over C<%INC> and reloads the file if it has
-changed on disk. 
+This package depends on Scalar::Util (XS version), since it
+makes use of the weaken and reftype functions therein.
 
-Set $AutoReloader::Debug to enable debugging output.
+Tested under perl-5.6.2.
 
-=head1 DIRECTION
+INSTALLATION
 
-It is expected that this will be included in the main perl
-distribution shortly.
+To install this module type the following:
 
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+  Scalar::Util - XS version
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2007 by Georg Moritz
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.8 or,
+at your option, any later version of Perl 5 you may have available.

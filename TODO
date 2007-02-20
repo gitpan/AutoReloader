@@ -1,0 +1,4 @@
+- all that's in the pod
+- extend test suite
+- check under autouse (autouse AutoReloader, autouse modules that use AutoReloader)
+- make this module obsolete by patching AutoLoader :-)

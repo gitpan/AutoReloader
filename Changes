@@ -1,0 +1,6 @@
+Revision history for Perl extension AutoReloader.
+
+0.01  Tue Feb 20 15:05:58 2007
+	- original version; created by h2xs 1.23 with options
+		-AX --use-new-tests -n AutoReloader -b 5.8.0
+

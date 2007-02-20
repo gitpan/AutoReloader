@@ -1,4 +1,9 @@
-AutoReloader.pm
+Changes
+Makefile.PL
 MANIFEST
 README
-Makefile.PL
+t/00_basic.t
+t/01_autoload.t
+t/02_autoloader.t
+t/03_subclass.t
+lib/AutoReloader.pm
