@@ -8,7 +8,7 @@ loading of files that return a subroutine reference on require.
 But it's main purpose is to provide reloading of subs.
 
 Each subroutine, when loaded, is wrapped into an outer sub.
-Inside that one, a check of the subroutine's source file is
+At each call, a check of the inner subroutine's source file is
 done, and if the value returned from that sub is different to
 the value at load time, the function is reloaded. If the
 reload fails, only the memorized check value is updated, and
@@ -41,7 +41,7 @@ This module requires these other modules and libraries:
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2007 by Georg Moritz
+Copyright (C) 2007 by Georg Moritz <shmem@cpan.org>
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,

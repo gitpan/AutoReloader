@@ -2,3 +2,8 @@
 - extend test suite
 - check under autouse (autouse AutoReloader, autouse modules that use AutoReloader)
 - make this module obsolete by patching AutoLoader :-)
+- provide for more path changes and access methods of subroutines
+  The 'auto' part of a subroutine should be changeable, as well as the full path
+  to a subroutine source file. Then, a subroutine's access method should be made
+  more flexible, e.g. reading code from some database, retrieve via LWP, or else.
+  But maybe that should be left to subclasses.

@@ -70,28 +70,9 @@ Default is 'sub { (stat $_[0]) [9] }', i.e. mtime.
 
 =back
 
-
 =head1 SEE ALSO
 
  AutoLoader, AutoSplit, DBIx::VersionedSubs
-
-=head1 TODO
-
-=over 4
-
-=item eliminate paranoia
-
-make this module truly subclassable. Turn lexical private subs into our() vars
-or into named subs. Make the %AL hash accessible. All that means re-think code
-calling semantics and uses of __PACKAGE__ . 
-
-=item provide for more path changes and access methods of subroutines
-
-The 'auto' part of a subroutine should be changeable, as well as the full path
-to a subroutine source file. Then, a subroutine's access method should be made
-more flexible, e.g. reading code from some database, retrieve via LWP, or else.
-
-=back
 
 =head1 BUGS
 
@@ -102,11 +83,16 @@ There might be others.
 
 =head1 Author
 
- shmem <gm@cruft.de>
+ shmem <shmem@cpan.org>
+
+=head1 CREDITS
+
+Many thanks to thospel, Corion, diotalevi, tye and chromatic (these are their
+http://perlmonks.org nicks) for review and most valuable hints.
 
 =head1 COPYRIGHT
 
-Copyright 2007 by shmem <gm@cruft.de>
+Copyright 2007 by shmem <shmem@cpan.org>
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
@@ -122,16 +108,13 @@ use File::Spec;
 
 our $VERSION   = 0.01;
 
-my $Debug = 0;
-
-our ($gensub, $load);
-
-our %AL; # hash holding all info about subs
+use vars qw($Debug %AL);
+$Debug = 0;
 
 sub new {
     my $class  = shift;
     my $caller = caller;
-    my $sub    = $gensub -> ($caller,@_);
+    my $sub    = gensub ($caller,@_);
 
     bless $sub, $class;
 }
@@ -145,18 +128,26 @@ sub auto {
 sub check {
     my $self = shift;
     if(ref($self)) {
-        ${ $AL {'Sub'} -> {Scalar::Util::refaddr ($self)} -> {'check'} } = shift;
-    } else {
-        $AL {'check'}   = shift;
+        ${ $AL {'Sub'} -> {Scalar::Util::refaddr ($self)} -> {'check'} }
+	    = shift if @_;
+        ${ $AL {'Sub'} -> {Scalar::Util::refaddr ($self)} -> {'check'} };
+    }
+    else {
+        $AL {'check'}  = shift;
+        $AL {'check'};
     }
 }
 
 sub checksub {
     my $self = shift;
     if(ref($self)) {
-        ${ $AL {'Sub'} -> {Scalar::Util::refaddr ($self)} -> {'checksub'} } = shift;
-    } else {
-        $AL {'checksub'} = shift;
+        ${ $AL {'Sub'} -> {Scalar::Util::refaddr ($self)} -> {'checksub'} }
+	    = shift if @_;
+	${ $AL {'Sub'} -> {Scalar::Util::refaddr ($self)} -> {'checksub'} };
+    }
+    else {
+        $AL {'checksub'} = shift if @_;
+        $AL {'checksub'};
     }
 }
 sub suffix {
@@ -169,12 +160,12 @@ checksub ( __PACKAGE__, sub { (stat $_[0]) [9] } );
 # default is not checking
 check    ( __PACKAGE__,  0);
 
-# $gensub - returns an anonymous subroutine.
+# gensub - returns an anonymous subroutine.
 # Parameters:
 # if one:  filename (full path)
 # if more: package, filename [, checkfuncref [, auto ]]
 
-$gensub = sub {
+sub gensub {
     my $package = scalar(@_) == 1 ? caller : shift;
     my $file    = shift;
     my $chkfunc = shift || $AL {'checksub'};
@@ -212,7 +203,8 @@ $gensub = sub {
 
     if (my $addr = $AL {'Inc'} -> {"$package\::$function"} ) {
         return $AL {Sub} -> {$addr} -> {'outer'};
-    } else {
+    }
+    else {
         # file not known yet
         my $inner;
         my $h        = {};
@@ -227,7 +219,7 @@ $gensub = sub {
             function => $subname,
         };
 
-        my $outer          = $load -> ($package, $file, $h) or die $@;
+        my $outer          = load ($package, $file, $h) or die $@;
         my $outeraddr      = Scalar::Util::refaddr ($outer);
 
         $h -> {'outer'} = $outer;
@@ -238,34 +230,43 @@ $gensub = sub {
         return bless $outer, __PACKAGE__;
     }
 };
-
-$load = sub {
-    my ($package, $file, $h) = @_;
-    delete $INC {$file};
-    my $ref = eval "package $package; require '$file'";
-    #warn $@ if $@;
-    return undef if $@;
-    {
-        # just in case the require dinn' return a ref -
-	# the it's likely a named subroutine has been loaded
-        Scalar::Util::reftype($ref) and Scalar::Util::reftype($ref) eq 'CODE'
-	    or $ref = \&{$h -> {'function'}};
-
-        ${$h->{inner}} = $ref;
-
-        my $sub = sub {
-            my $cr = $h -> {'checkref'};
-            if( ${ $h -> {'check'} } and ${ $h-> {'checksub'} }
-                                     and
-            ( my $c = ${ $h->{checksub} } -> ($file) ) != $$cr) {
-                warn "reloading $file" if $Debug;
-                $$cr = $c;
-                $load -> ($package, $file, $h);
-            }
-	    goto ${ $h -> {'inner'} };
-        };
+{
+    my $load = \&load;
+    sub load {
+	my ($package, $file, $h) = @_;
+	delete $INC {$file};
+	my $ref = eval "package $package; require '$file'";
+	#warn $@ if $@;
+	return undef if $@;
+	{
+	    # just in case the require dinn' return a ref -
+	    # then a named subroutine has been loaded.
+	    # All other cases are errors.
+	    unless (
+	      Scalar::Util::reftype($ref)
+	                 and
+	      Scalar::Util::reftype($ref) eq 'CODE') {
+		$ref = \&{$h -> {'function'}};
+		no strict 'refs';
+		no warnings 'redefine';
+		*{$h -> {'function'} } = $h ->{'outer'} if $h -> {'outer'};
+	    }
+	    ${$h->{inner}} = $ref;
+    
+	    my $sub = sub {
+		my $cr = $h -> {'checkref'};
+		if( ${ $h -> {'check'} } and ${ $h-> {'checksub'} }
+					and
+		( my $c = ${ $h->{checksub} } -> ($file) ) != $$cr) {
+		    warn "reloading $file" if $Debug;
+		    $$cr = $c;
+		    $load -> ($package, $file, $h);
+		}
+		goto ${ $h -> {'inner'} };
+	    };
+	}
     }
-};
+}
 
 sub DESTROY {
     my $outeraddr = Scalar::Util::refaddr ($_[0]);
@@ -285,7 +286,7 @@ sub AUTOLOAD {
     my $save = $@;
     local $!; # Do not munge the value. 
     my $ref;
-    eval { local $SIG{__DIE__}; $ref = $gensub -> ($pkg, $func, '', $AL{'auto'} || 'auto'); };
+    eval { local $SIG{__DIE__}; $ref = gensub ($pkg, $func, '', $AL{'auto'} || 'auto'); };
     if ($@) {
         if (substr ($sub,-9) eq '::DESTROY') {
             no strict 'refs';
@@ -338,7 +339,7 @@ sub can {
     my $pkg           = ref( $self ) || $self;
     local $@;
     my $ref;
-    $ref = eval { local $SIG{__DIE__}; $ref = $gensub -> ($pkg, $func, '', $AL{'auto'} || 'auto'); }
+    $ref = eval { local $SIG{__DIE__}; $ref = gensub ($pkg, $func, '', $AL{'auto'} || 'auto'); }
 	or return undef;
     no strict 'refs';
     no warnings 'redefine';
